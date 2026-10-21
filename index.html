@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniMax M3.1 Flash</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #F6F5F0;
+      color: #111111;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    /* MiniMax Official Brand Gradient (Magenta-Red -> Coral -> Warm Orange) */
+    .minimax-gradient-text {
+      background: linear-gradient(125deg, #FF2442 0%, #FF5B2E 52%, #FF9436 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .minimax-gradient-bg {
+      background: linear-gradient(125deg, #FF2442 0%, #FF5B2E 52%, #FF9436 100%);
+    }
+
+    /* Architectural Hairlines */
+    .hairline-t { border-top: 1px solid rgba(17, 17, 17, 0.1); }
+    .hairline-b { border-bottom: 1px solid rgba(17, 17, 17, 0.1); }
+    .hairline-l { border-left: 1px solid rgba(17, 17, 17, 0.1); }
+
+    /* Spatial Slide Choreography (Clean Editorial Z-Axis & Parallax Glide) */
+    .stage-container {
+      perspective: 1800px;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transform-style: preserve-3d;
+      transition:
+        transform 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+        filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, opacity, filter;
+    }
+
+    .slide[data-state="active"] {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate3d(0, 0, 0) scale(1);
+      filter: blur(0px);
+      z-index: 20;
+    }
+
+    .slide[data-state="prev"] {
+      opacity: 0;
+      transform: translate3d(0, -6%, -180px) scale(0.94);
+      filter: blur(6px);
+      z-index: 10;
+    }
+
+    .slide[data-state="next"] {
+      opacity: 0;
+      transform: translate3d(0, 8%, 120px) scale(1.04);
+      filter: blur(8px);
+      z-index: 10;
+    }
+
+    /* Kinetic Typography Mask Reveal */
+    .mask-line {
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: bottom;
+      padding-bottom: 0.06em;
+    }
+
+    .mask-item {
+      display: inline-block;
+      transform: translateY(112%) rotateX(-65deg);
+      transform-origin: left top;
+      transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide[data-state="active"] .mask-item {
+      transform: translateY(0%) rotateX(0deg);
+    }
+
+    /* Spring Rise Elements (No Boxes, Pure Typographic Choreography) */
+    .spring-rise {
+      opacity: 0;
+      transform: translateY(36px);
+      transition:
+        transform 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide[data-state="active"] .spring-rise {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* SVG Line Draw */
+    .draw-line {
+      stroke-dasharray: 1200;
+      stroke-dashoffset: 1200;
+      transition: stroke-dashoffset 1.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide[data-state="active"] .draw-line {
+      stroke-dashoffset: 0;
+    }
+
+    /* MiniMax Logo Animated Bars */
+    .logo-bar {
+      transform-origin: center;
+      transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between bg-[#F6F5F0] text-[#111111] overflow-hidden">
+
+  <!-- Ambient Minimalist Background Canvas (Subtle Warm Ribbon Flow) -->
+  <canvas id="ambient-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-0"></canvas>
+
+  <!-- Minimalist Editorial Top Bar -->
+  <header class="relative z-30 flex items-center justify-between px-10 md:px-16 pt-7 pb-4">
+    <!-- Authentic MiniMax Wave Mark + Brand Name -->
+    <div class="flex items-center gap-3.5">
+      <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none">
+        <defs>
+          <linearGradient id="mmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#FF2442" />
+            <stop offset="55%" stop-color="#FF5B2E" />
+            <stop offset="100%" stop-color="#FF9436" />
+          </linearGradient>
+        </defs>
+        <!-- MiniMax signature continuous rounded-cap wave -->
+        <path d="M8 28V20M14.5 34V14M21 39V9M27.5 33V15M34 37V11M40.5 29V19" stroke="url(#mmGrad)" stroke-width="4.2" stroke-linecap="round"/>
+      </svg>
+      <span class="font-bold tracking-tight text-base text-[#111111]">MiniMax</span>
+      <span class="text-stone-400 font-light">/</span>
+      <span class="text-sm font-medium text-stone-500">M3.1 Flash</span>
+    </div>
+
+    <!-- Minimalist Step Dots -->
+    <nav class="hidden md:flex items-center gap-6">
+      <button onclick="goToSlide(0)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">01 揭晓</button>
+      <button onclick="goToSlide(1)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">02 架构</button>
+      <button onclick="goToSlide(2)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">03 速度与成本</button>
+      <button onclick="goToSlide(3)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">04 实战</button>
+      <button onclick="goToSlide(4)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">05 思考流</button>
+      <button onclick="goToSlide(5)" class="nav-dot text-xs font-medium transition-colors cursor-pointer">06 开源与未来</button>
+    </nav>
+
+    <!-- Subtle Controls -->
+    <div class="flex items-center gap-4 text-xs text-stone-500">
+      <button id="autoplay-btn" onclick="toggleAutoPlay()" class="flex items-center gap-2 hover:text-[#111111] transition-colors cursor-pointer">
+        <span id="autoplay-dot" class="w-2 h-2 rounded-full bg-[#FF4D2D]"></span>
+        <span id="autoplay-label">自动播放</span>
+      </button>
+      <span class="text-stone-300">|</span>
+      <button onclick="replayCurrentSlide()" class="hover:text-[#111111] transition-colors cursor-pointer">重播动效</button>
+      <span class="text-stone-300">|</span>
+      <button onclick="toggleFullScreen()" class="hover:text-[#111111] transition-colors cursor-pointer">全屏</button>
+    </div>
+  </header>
+
+  <!-- Slide Stage -->
+  <main class="relative flex-1 w-full stage-container overflow-hidden z-20">
+
+    <!-- =========================================================
+         SLIDE 01: 悬念揭晓 — Space Bunny 即 MiniMax M3.1 Flash
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="0" data-state="active">
+      <div class="my-auto max-w-6xl w-full mx-auto">
+
+        <!-- Morphing Codename Line -->
+        <div class="spring-rise flex items-center gap-3 text-sm font-medium text-stone-500 mb-6" style="transition-delay: 60ms;">
+          <span class="inline-block w-2 h-2 rounded-full minimax-gradient-bg"></span>
+          <span>200 万亿 Token 匿名盲测代号</span>
+          <span id="s1-bunny-pill" class="font-mono text-[#FF4D2D] font-semibold tracking-wide">“Space Bunny”</span>
+          <span>正式揭晓</span>
+        </div>
+
+        <!-- Giant Kinetic Headline -->
+        <h1 class="text-5xl md:text-8xl font-extrabold tracking-tight leading-[1.04] text-[#111111]">
+          <span class="mask-line"><span id="s1-morph-title" class="mask-item" style="transition-delay: 120ms;">MiniMax M3.1 Flash</span></span>
+        </h1>
+
+        <p class="text-xl md:text-3xl font-normal text-stone-500 mt-6 max-w-3xl leading-snug spring-rise" style="transition-delay: 260ms;">
+          新一代轻量级主力模型。把旗舰级的复杂任务能力，装进快如闪电的响应速度里。
+        </p>
+
+        <!-- Animated Minimalist Soundwave Morph Graphic -->
+        <div class="mt-12 spring-rise" style="transition-delay: 380ms;">
+          <svg id="s1-wave-svg" class="w-full max-w-2xl h-16 overflow-visible" viewBox="0 0 600 64" fill="none">
+            <!-- Populated by JS: 32 sleek rounded vertical wave bars that ripple in a wave -->
+          </svg>
+        </div>
+      </div>
+
+      <!-- Bottom Architectural Ledger (Zero Cards, Just Hairline & Numbers) -->
+      <div class="max-w-6xl w-full mx-auto hairline-t pt-6 grid grid-cols-3 gap-8 spring-rise" style="transition-delay: 480ms;">
+        <div>
+          <div class="text-xs text-stone-400 uppercase tracking-widest">原生上下文</div>
+          <div class="text-2xl md:text-3xl font-bold text-[#111111] mt-1">1,000,000 <span class="text-sm font-normal text-stone-500">Tokens</span></div>
+        </div>
+        <div class="hairline-l pl-8">
+          <div class="text-xs text-stone-400 uppercase tracking-widest">生成速度</div>
+          <div class="text-2xl md:text-3xl font-bold minimax-gradient-text mt-1">200+ <span class="text-sm font-normal text-stone-500">Tokens/s</span></div>
+        </div>
+        <div class="hairline-l pl-8">
+          <div class="text-xs text-stone-400 uppercase tracking-widest">Agent 综合成本</div>
+          <div class="text-2xl md:text-3xl font-bold text-[#111111] mt-1">-70% <span class="text-sm font-normal text-stone-500">较上一代</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         SLIDE 02: 黄金架构 — 428B 的厚度，23B 的轻盈
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="1" data-state="next">
+      <div class="my-auto max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
+        <!-- Left 7 Cols: Pure Editorial Statement -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="text-xs font-medium tracking-widest uppercase text-[#FF4D2D] spring-rise">02 / 稀疏混合专家架构 (MoE)</div>
+
+          <h2 class="text-4xl md:text-7xl font-extrabold tracking-tight leading-[1.08] text-[#111111]">
+            <span class="mask-line"><span class="mask-item" style="transition-delay: 80ms;">428B 的知识厚度，</span></span><br/>
+            <span class="mask-line"><span class="mask-item minimax-gradient-text" style="transition-delay: 180ms;">23B 的轻盈激活。</span></span>
+          </h2>
+
+          <p class="text-lg md:text-xl text-stone-500 max-w-xl leading-relaxed spring-rise" style="transition-delay: 300ms;">
+            不必每次都动用全部算力。面对每一个 Token，模型从 4280 亿总参数中精准唤醒最核心的 <span class="text-[#111111] font-semibold">5.4%</span> 专家网络——既有大模型的深厚功底，又有小模型的敏捷身手。
+          </p>
+
+          <!-- Clean 1M Context Elastic Line -->
+          <div class="pt-6 space-y-3 max-w-xl spring-rise" style="transition-delay: 420ms;">
+            <div class="flex justify-between items-baseline">
+              <span class="text-sm font-medium text-stone-500">原生超长上下文窗口</span>
+              <span class="text-2xl font-bold text-[#111111] font-mono">1M Tokens</span>
+            </div>
+            <div class="w-full h-[3px] bg-stone-200 overflow-hidden">
+              <div id="s2-context-line" class="h-full w-0 minimax-gradient-bg transition-all duration-1000 ease-out"></div>
+            </div>
+            <div class="text-xs text-stone-400">可一次性完整读入大型工程代码库或数百份长文档</div>
+          </div>
+        </div>
+
+        <!-- Right 5 Cols: Minimalist Architectural Dot Matrix (No borders, no text clutter) -->
+        <div class="lg:col-span-5 flex flex-col items-center lg:items-end justify-center spring-rise" style="transition-delay: 260ms;">
+          <div class="w-full max-w-[340px]">
+            <div class="flex justify-between items-baseline mb-5">
+              <span class="text-xs text-stone-400 uppercase tracking-widest">实时专家激活示意</span>
+              <span class="text-3xl font-extrabold minimax-gradient-text font-mono"><span class="count-num" data-target="5.4" data-decimals="1" data-suffix="%">0.0%</span></span>
+            </div>
+
+            <!-- 64 Minimalist Dots -->
+            <div id="s2-dot-matrix" class="grid grid-cols-8 gap-4 py-4">
+              <!-- Populated by JS: Pure circles, 4 glow warm coral-orange smoothly -->
+            </div>
+
+            <div class="flex items-center gap-6 text-xs text-stone-400 mt-6 pt-4 hairline-t">
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full minimax-gradient-bg"></span> 23B 动态唤醒</span>
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-stone-300"></span> 428B 专家储备</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div></div>
+    </section>
+
+    <!-- =========================================================
+         SLIDE 03: 速度与成本 — 3 倍提速，成本直降 70%
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="2" data-state="next">
+      <div class="my-auto max-w-6xl w-full mx-auto space-y-14">
+
+        <!-- Headline -->
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div class="text-xs font-medium tracking-widest uppercase text-[#FF4D2D] mb-3 spring-rise">03 / 速度与经济性</div>
+            <h2 class="text-4xl md:text-7xl font-extrabold tracking-tight leading-[1.06] text-[#111111]">
+              <span class="mask-line"><span class="mask-item">快上三倍，</span></span>
+              <span class="mask-line"><span class="mask-item minimax-gradient-text" style="transition-delay: 140ms;">省下七成。</span></span>
+            </h2>
+          </div>
+          <button onclick="runSpeedLines()" class="self-start md:self-end text-xs font-medium text-stone-500 hover:text-[#111111] pb-1 border-b border-stone-400 transition-colors cursor-pointer">
+            ↻ 重新触发速度对比
+          </button>
+        </div>
+
+        <!-- Minimalist Two-Line Velocity Comparison -->
+        <div class="space-y-8 spring-rise" style="transition-delay: 220ms;">
+          <!-- M3.1 Flash Line -->
+          <div class="space-y-3">
+            <div class="flex justify-between items-baseline">
+              <div class="flex items-center gap-3">
+                <span class="text-lg md:text-xl font-bold text-[#111111]">MiniMax M3.1 Flash</span>
+                <span class="text-xs text-[#FF4D2D] font-medium">3.0x 推理加速</span>
+              </div>
+              <div class="text-4xl md:text-6xl font-extrabold minimax-gradient-text tracking-tight">
+                <span id="s3-fast-num">205</span> <span class="text-base font-normal text-stone-500">Tokens / sec</span>
+              </div>
+            </div>
+            <div class="w-full h-2 bg-stone-200/80 rounded-full overflow-hidden">
+              <div id="s3-bar-fast" class="h-full w-0 minimax-gradient-bg rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- Conventional Line -->
+          <div class="space-y-3">
+            <div class="flex justify-between items-baseline text-stone-400">
+              <span class="text-base font-medium">上一代同级模型</span>
+              <div class="text-2xl md:text-3xl font-semibold">
+                <span id="s3-slow-num">68</span> <span class="text-sm font-normal">Tokens / sec</span>
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-stone-200/80 rounded-full overflow-hidden">
+              <div id="s3-bar-slow" class="h-full w-0 bg-stone-400 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clean Hairline Pricing Ledger -->
+        <div class="hairline-t pt-8 grid grid-cols-1 md:grid-cols-3 gap-8 spring-rise" style="transition-delay: 360ms;">
+          <div>
+            <div class="text-xs text-stone-400 uppercase tracking-widest">Agent 任务综合成本</div>
+            <div class="text-4xl font-extrabold text-[#111111] mt-2">-70%</div>
+            <div class="text-xs text-stone-500 mt-1">长链路多步调用不再昂贵</div>
+          </div>
+          <div class="hairline-l pl-8">
+            <div class="text-xs text-stone-400 uppercase tracking-widest">API 输入价格</div>
+            <div class="text-4xl font-extrabold text-[#111111] mt-2">¥1.0 <span class="text-sm font-normal text-stone-500">/ 百万 Token</span></div>
+            <div class="text-xs text-stone-400 mt-1">缓存读取仅 ¥0.1 / 百万 Token ($0.015)</div>
+          </div>
+          <div class="hairline-l pl-8">
+            <div class="text-xs text-stone-400 uppercase tracking-widest">API 输出价格</div>
+            <div class="text-4xl font-extrabold text-[#111111] mt-2">¥4.0 <span class="text-sm font-normal text-stone-500">/ 百万 Token</span></div>
+            <div class="text-xs text-stone-400 mt-1">海外定价 $0.60 / 1M Tokens</div>
+          </div>
+        </div>
+
+      </div>
+      <div></div>
+    </section>
+
+    <!-- =========================================================
+         SLIDE 04: 实战表现 — 四个数字，定义全能 Agent
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="3" data-state="next">
+      <div class="my-auto max-w-6xl w-full mx-auto space-y-14">
+
+        <!-- Headline -->
+        <div class="max-w-3xl">
+          <div class="text-xs font-medium tracking-widest uppercase text-[#FF4D2D] mb-3 spring-rise">04 / 真实工程与智能体基准</div>
+          <h2 class="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.08] text-[#111111]">
+            <span class="mask-line"><span class="mask-item">从写代码到操作电脑，</span></span><br/>
+            <span class="mask-line"><span class="mask-item minimax-gradient-text" style="transition-delay: 140ms;">全栈实战代际跃升。</span></span>
+          </h2>
+        </div>
+
+        <!-- 4-Column Architectural Typographic Ledger (No Boxes!) -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 hairline-t pt-10">
+
+          <!-- Col 1 -->
+          <div class="spring-rise space-y-4" style="transition-delay: 160ms;">
+            <div class="text-xs font-semibold text-[#FF4D2D] tracking-wider uppercase">国产模型第一 #1</div>
+            <div class="text-5xl md:text-6xl font-extrabold text-[#111111] tracking-tight">
+              <span class="count-num" data-target="61.7" data-decimals="1">0.0</span>
+            </div>
+            <div class="text-lg font-bold text-[#111111] pt-1">电脑操作 Computer Use</div>
+            <p class="text-sm text-stone-500 leading-relaxed">
+              OSWorld V2 取得 61.7 分、ALE 取得 29.6 分，双双位列国产第一，可自主跨软件点击与执行桌面工作流。
+            </p>
+          </div>
+
+          <!-- Col 2 -->
+          <div class="spring-rise space-y-4 md:hairline-l md:pl-8" style="transition-delay: 260ms;">
+            <div class="text-xs font-semibold text-stone-400 tracking-wider uppercase">DeepSWE v1.1</div>
+            <div class="text-5xl md:text-6xl font-extrabold minimax-gradient-text tracking-tight">
+              <span class="count-num" data-target="73.7" data-decimals="1" data-suffix="%">0.0%</span>
+            </div>
+            <div class="text-lg font-bold text-[#111111] pt-1">软件工程与编程</div>
+            <p class="text-sm text-stone-500 leading-relaxed">
+              结合 1M 上下文全局理解代码仓库，独立完成复杂特性开发、Bug 定位修复与自动化测试。
+            </p>
+          </div>
+
+          <!-- Col 3 -->
+          <div class="spring-rise space-y-4 md:hairline-l md:pl-8" style="transition-delay: 360ms;">
+            <div class="text-xs font-semibold text-stone-400 tracking-wider uppercase">CyberGym 基准</div>
+            <div class="text-5xl md:text-6xl font-extrabold text-[#111111] tracking-tight">
+              <span class="count-num" data-target="82.2" data-decimals="1">0.0</span>
+            </div>
+            <div class="text-lg font-bold text-[#111111] pt-1">网络安全漏洞审计</div>
+            <p class="text-sm text-stone-500 leading-relaxed">
+              深度追踪大型项目潜在安全漏洞、完成代码安全审计并自动生成可验证的修复补丁。
+            </p>
+          </div>
+
+          <!-- Col 4 -->
+          <div class="spring-rise space-y-4 md:hairline-l md:pl-8" style="transition-delay: 460ms;">
+            <div class="text-xs font-semibold text-stone-400 tracking-wider uppercase">Automation-Bench</div>
+            <div class="text-5xl md:text-6xl font-extrabold text-[#111111] tracking-tight">
+              SOTA
+            </div>
+            <div class="text-lg font-bold text-[#111111] pt-1">跨系统企业自动化</div>
+            <p class="text-sm text-stone-500 leading-relaxed">
+              在串联 CRM、ERP 与金融工具的复杂多步流程中超越多个国际主流模型，稳定完成业务闭环。
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+      <div></div>
+    </section>
+
+    <!-- =========================================================
+         SLIDE 05: 可控思考 — 动态调节推理深度 (Full-Bleed Ribbon Wave)
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="4" data-state="next">
+      <div class="my-auto max-w-6xl w-full mx-auto space-y-10">
+
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div class="text-xs font-medium tracking-widest uppercase text-[#FF4D2D] mb-3 spring-rise">05 / 可控思考深度</div>
+            <h2 class="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.08] text-[#111111]">
+              <span class="mask-line"><span class="mask-item">简单问题秒回，</span></span><br/>
+              <span class="mask-line"><span class="mask-item minimax-gradient-text" style="transition-delay: 140ms;">复杂难题深思。</span></span>
+            </h2>
+          </div>
+
+          <!-- Clean Typographic Mode Switcher -->
+          <div class="flex items-center gap-6 spring-rise" style="transition-delay: 240ms;">
+            <button onclick="setWaveDepth(1)" id="wbtn-1" class="text-sm font-medium pb-1.5 transition-all cursor-pointer">01 浅思考 Light</button>
+            <button onclick="setWaveDepth(2)" id="wbtn-2" class="text-sm font-medium pb-1.5 transition-all cursor-pointer">02 均衡 Balanced</button>
+            <button onclick="setWaveDepth(3)" id="wbtn-3" class="text-sm font-bold text-[#111111] border-b-2 border-[#FF4D2D] pb-1.5 transition-all cursor-pointer">03 深推演 Deep</button>
+          </div>
+        </div>
+
+        <!-- Open Canvas Wave (No dark box wrapper! Directly on the warm paper canvas) -->
+        <div class="relative w-full h-48 spring-rise" style="transition-delay: 300ms;">
+          <canvas id="ribbon-wave-canvas" class="w-full h-full"></canvas>
+        </div>
+
+        <!-- Dynamic Description Row -->
+        <div class="hairline-t pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4 spring-rise" style="transition-delay: 400ms;">
+          <div id="wave-desc-title" class="text-xl font-bold text-[#111111]">
+            深推演模式 (Deep Think) — 多路径反思与长链逻辑推演
+          </div>
+          <div id="wave-desc-sub" class="text-sm text-stone-500">
+            支持在同一对话中动态无极调节思考深度，按需分配算力与延迟
+          </div>
+        </div>
+
+      </div>
+      <div></div>
+    </section>
+
+    <!-- =========================================================
+         SLIDE 06: 开源与未来 — 现已上线 · 10.23 开源 · Pro 将至
+         ========================================================= -->
+    <section class="slide flex flex-col justify-between px-10 md:px-20 py-10" data-slide="5" data-state="next">
+      <div class="my-auto max-w-6xl w-full mx-auto space-y-16">
+
+        <div class="space-y-4">
+          <div class="text-xs font-medium tracking-widest uppercase text-[#FF4D2D] spring-rise">06 / 生态与路线图</div>
+          <h2 class="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.06] text-[#111111]">
+            <span class="mask-line"><span class="mask-item">现已全面上线，</span></span><br/>
+            <span class="mask-line"><span class="mask-item minimax-gradient-text" style="transition-delay: 140ms;">开源与 Pro 接踵而至。</span></span>
+          </h2>
+        </div>
+
+        <!-- Single Architectural Timeline Line + 3 Stops -->
+        <div class="space-y-8">
+          <svg class="w-full h-4 hidden md:block overflow-visible" viewBox="0 0 1000 16" fill="none">
+            <line x1="0" y1="8" x2="1000" y2="8" stroke="rgba(17,17,17,0.1)" stroke-width="1.5" />
+            <line x1="0" y1="8" x2="1000" y2="8" stroke="url(#mmGrad)" stroke-width="2.5" class="draw-line" />
+            <circle cx="12" cy="8" r="5" fill="#FF2442" />
+            <circle cx="350" cy="8" r="5" fill="#FF5B2E" />
+            <circle cx="690" cy="8" r="5" fill="#FF9436" />
+          </svg>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div class="spring-rise space-y-2" style="transition-delay: 200ms;">
+              <div class="text-xs font-mono text-[#FF4D2D] font-semibold">10 月 19 日 · LIVE</div>
+              <div class="text-2xl font-bold text-[#111111]">全渠道正式上线</div>
+              <p class="text-sm text-stone-500 leading-relaxed pt-1">
+                现已接入 MiniMax API、M Plan 与 MiniMax Code 终端智能体，即刻可调。
+              </p>
+            </div>
+
+            <div class="spring-rise space-y-2" style="transition-delay: 320ms;">
+              <div class="text-xs font-mono text-[#FF5B2E] font-semibold">10 月 23 日 · OPEN WEIGHTS</div>
+              <div class="text-2xl font-bold text-[#111111]">模型权重正式开源</div>
+              <p class="text-sm text-stone-500 leading-relaxed pt-1">
+                全面开放 M3.1 Flash 模型权重，赋能私有化部署与开发者生态共建。
+              </p>
+            </div>
+
+            <div class="spring-rise space-y-2" style="transition-delay: 440ms;">
+              <div class="text-xs font-mono text-stone-400 font-semibold">COMING SOON · FLAGSHIP</div>
+              <div class="text-2xl font-bold text-[#111111]">MiniMax M3.1 Pro</div>
+              <p class="text-sm text-stone-500 leading-relaxed pt-1">
+                探索更高智能上限的旗舰型号 M3.1 Pro 即将推出。
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Brand Lockup -->
+      <div class="max-w-6xl w-full mx-auto hairline-t pt-6 flex items-center justify-between spring-rise" style="transition-delay: 540ms;">
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-bold text-[#111111]">MiniMax M3.1 Flash</span>
+          <span class="text-xs text-stone-400">— Intelligence with Velocity</span>
+        </div>
+        <button onclick="goToSlide(0)" class="text-xs font-semibold text-[#FF4D2D] hover:opacity-80 transition-opacity cursor-pointer">
+          ↺ 重新播放整套演示
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Minimalist Bottom Progress & Page Indicator -->
+  <footer class="relative z-30 px-10 md:px-16 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-4 w-48">
+      <span id="page-num" class="text-xs font-mono font-semibold text-[#111111]">01 / 06</span>
+      <div class="flex-1 h-[2px] bg-stone-200 overflow-hidden">
+        <div id="auto-progress" class="h-full minimax-gradient-bg w-0"></div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-6 text-xs font-medium text-stone-500">
+      <button onclick="prevSlide()" class="hover:text-[#111111] transition-colors cursor-pointer">← 上一页</button>
+      <button onclick="nextSlide()" class="text-[#111111] font-semibold hover:text-[#FF4D2D] transition-colors cursor-pointer">下一页 →</button>
+    </div>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // 1. SLIDE NAVIGATION & CHOREOGRAPHY
+    // =========================================================================
+    const totalSlides = 6;
+    let currentSlide = 0;
+    let autoPlay = true;
+    const SLIDE_MS = 7000;
+    let elapsed = 0;
+    let lastTime = performance.now();
+
+    const slides = document.querySelectorAll('.slide');
+    const navDots = document.querySelectorAll('.nav-dot');
+
+    function updateUI() {
+      slides.forEach((s, i) => {
+        if (i === currentSlide) s.setAttribute('data-state', 'active');
+        else if (i < currentSlide) s.setAttribute('data-state', 'prev');
+        else s.setAttribute('data-state', 'next');
+      });
+
+      navDots.forEach((d, i) => {
+        if (i === currentSlide) {
+          d.className = 'nav-dot text-xs font-bold text-[#111111] border-b-2 border-[#FF4D2D] pb-0.5 transition-all cursor-pointer';
+        } else {
+          d.className = 'nav-dot text-xs font-medium text-stone-400 hover:text-[#111111] pb-0.5 transition-all cursor-pointer';
+        }
+      });
+
+      document.getElementById('page-num').textContent = `0${currentSlide + 1} / 0${totalSlides}`;
+    }
+
+    // EaseOutExpo Number Counter
+    function animateCounters(slideEl) {
+      slideEl.querySelectorAll('.count-num').forEach(el => {
+        const target = parseFloat(el.getAttribute('data-target') || '0');
+        const dec = parseInt(el.getAttribute('data-decimals') || '0', 10);
+        const suffix = el.getAttribute('data-suffix') || '';
+        const start = performance.now();
+        const dur = 1100;
+
+        function tick(now) {
+          const t = Math.min(1, (now - start) / dur);
+          const ease = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+          el.textContent = (target * ease).toFixed(dec) + suffix;
+          if (t < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+
+    // Smooth Character Morph for Slide 1 ("Space Bunny" -> "MiniMax M3.1 Flash")
+    const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.';
+    function morphHeadline(el, fromText, toText, duration = 900) {
+      if (!el) return;
+      el.textContent = fromText;
+      setTimeout(() => {
+        const start = performance.now();
+        const len = toText.length;
+        function step(now) {
+          const p = Math.min(1, (now - start) / duration);
+          let str = '';
+          for (let i = 0; i < len; i++) {
+            if (toText[i] === ' ') str += ' ';
+            else if (i / len < p) str += toText[i];
+            else str += CHARS[Math.floor(Math.random() * CHARS.length)];
+          }
+          el.textContent = str;
+          if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }, 450);
+    }
+
+    function runSlideTriggers(idx) {
+      animateCounters(slides[idx]);
+
+      if (idx === 0) {
+        morphHeadline(
+          document.getElementById('s1-morph-title'),
+          'Space Bunny // 200T',
+          'MiniMax M3.1 Flash',
+          750
+        );
+      }
+
+      if (idx === 1) {
+        const line = document.getElementById('s2-context-line');
+        line.style.width = '0%';
+        setTimeout(() => { line.style.width = '100%'; }, 250);
+      }
+
+      if (idx === 2) {
+        runSpeedLines();
+      }
+    }
+
+    function goToSlide(idx) {
+      currentSlide = (idx + totalSlides) % totalSlides;
+      elapsed = 0;
+      updateUI();
+      runSlideTriggers(currentSlide);
+    }
+
+    function nextSlide() { goToSlide(currentSlide + 1); }
+    function prevSlide() { goToSlide(currentSlide - 1); }
+
+    function replayCurrentSlide() {
+      const s = slides[currentSlide];
+      s.setAttribute('data-state', 'next');
+      setTimeout(() => {
+        s.setAttribute('data-state', 'active');
+        runSlideTriggers(currentSlide);
+      }, 70);
+    }
+
+    function toggleAutoPlay() {
+      autoPlay = !autoPlay;
+      elapsed = 0;
+      document.getElementById('autoplay-label').textContent = autoPlay ? '自动播放' : '已暂停';
+      document.getElementById('autoplay-dot').className = autoPlay
+        ? 'w-2 h-2 rounded-full bg-[#FF4D2D]'
+        : 'w-2 h-2 rounded-full bg-stone-300';
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
+    }
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+      else if (e.key === 'f' || e.key === 'F') toggleFullScreen();
+    });
+
+    // =========================================================================
+    // 2. SLIDE 01: MINIMAX SIGNATURE SOUNDWAVE RIBBON BARS
+    // =========================================================================
+    const waveSvg = document.getElementById('s1-wave-svg');
+    const waveBars = [];
+    const BAR_COUNT = 36;
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      const x = i * 16 + 6;
+      line.setAttribute('x1', x);
+      line.setAttribute('x2', x);
+      line.setAttribute('y1', 20);
+      line.setAttribute('y2', 44);
+      line.setAttribute('stroke', 'url(#mmGrad)');
+      line.setAttribute('stroke-width', '4.5');
+      line.setAttribute('stroke-linecap', 'round');
+      waveSvg.appendChild(line);
+      waveBars.push(line);
+    }
+
+    // =========================================================================
+    // 3. SLIDE 02: MINIMALIST 64-DOT MOE MATRIX
+    // =========================================================================
+    const dotMatrix = document.getElementById('s2-dot-matrix');
+    const dots = [];
+    for (let i = 0; i < 64; i++) {
+      const d = document.createElement('div');
+      d.className = 'w-3 h-3 rounded-full bg-stone-300/80 transition-all duration-300 mx-auto';
+      dotMatrix.appendChild(d);
+      dots.push(d);
+    }
+
+    setInterval(() => {
+      if (currentSlide !== 1) return;
+      dots.forEach(d => {
+        d.className = 'w-3 h-3 rounded-full bg-stone-300/70 scale-100 transition-all duration-300 mx-auto';
+      });
+      const picked = new Set();
+      while (picked.size < 4) picked.add(Math.floor(Math.random() * 64));
+      picked.forEach(idx => {
+        dots[idx].className = 'w-3 h-3 rounded-full minimax-gradient-bg scale-150 transition-all duration-200 mx-auto';
+      });
+    }, 550);
+
+    // =========================================================================
+    // 4. SLIDE 03: CLEAN VELOCITY RACE BARS
+    // =========================================================================
+    let speedAnimId = null;
+    function runSpeedLines() {
+      cancelAnimationFrame(speedAnimId);
+      const fastBar = document.getElementById('s3-bar-fast');
+      const slowBar = document.getElementById('s3-bar-slow');
+      const fastNum = document.getElementById('s3-fast-num');
+      const slowNum = document.getElementById('s3-slow-num');
+
+      const start = performance.now();
+      const fastDuration = 900;
+      const slowDuration = 2700;
+
+      function step(now) {
+        const dt = now - start;
+        const pFast = Math.min(1, dt / fastDuration);
+        const pSlow = Math.min(1, dt / slowDuration);
+
+        const easeFast = 1 - Math.pow(1 - pFast, 3);
+        const easeSlow = 1 - Math.pow(1 - pSlow, 2);
+
+        fastBar.style.width = `${easeFast * 100}%`;
+        slowBar.style.width = `${easeSlow * 33.3}%`;
+
+        fastNum.textContent = Math.round(easeFast * 205);
+        slowNum.textContent = Math.round(easeSlow * 68);
+
+        if (pFast < 1 || pSlow < 1) {
+          speedAnimId = requestAnimationFrame(step);
+        }
+      }
+      speedAnimId = requestAnimationFrame(step);
+    }
+
+    // =========================================================================
+    // 5. SLIDE 05: TUNABLE REASONING RIBBON WAVE
+    // =========================================================================
+    let waveDepth = 3;
+    function setWaveDepth(level) {
+      waveDepth = level;
+      const info = {
+        1: {
+          title: '浅思考模式 (Light) — 毫秒级极速直出',
+          sub: '适用于高频 UI 交互、指令路由与简单格式整理'
+        },
+        2: {
+          title: '均衡模式 (Balanced) — 兼顾 200+ TPS 极速与严密逻辑',
+          sub: '适用于日常代码生成、长文档提炼与常规 Agent 任务'
+        },
+        3: {
+          title: '深推演模式 (Deep Think) — 多路径反思与长链逻辑推演',
+          sub: '适用于大型代码库跨文件重构、OSWorld 复杂操作与漏洞挖掘'
+        }
+      };
+
+      document.getElementById('wave-desc-title').textContent = info[level].title;
+      document.getElementById('wave-desc-sub').textContent = info[level].sub;
+
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById(`wbtn-${i}`);
+        if (i === level) {
+          btn.className = 'text-sm font-bold text-[#111111] border-b-2 border-[#FF4D2D] pb-1.5 transition-all cursor-pointer';
+        } else {
+          btn.className = 'text-sm font-medium text-stone-400 hover:text-[#111111] pb-1.5 transition-all cursor-pointer';
+        }
+      }
+    }
+
+    // =========================================================================
+    // 6. 60FPS MASTER ANIMATION LOOP
+    // =========================================================================
+    const ambCanvas = document.getElementById('ambient-canvas');
+    const ambCtx = ambCanvas.getContext('2d');
+    const ribCanvas = document.getElementById('ribbon-wave-canvas');
+    const ribCtx = ribCanvas.getContext('2d');
+
+    function resize() {
+      ambCanvas.width = window.innerWidth;
+      ambCanvas.height = window.innerHeight;
+      if (ribCanvas.parentElement) {
+        ribCanvas.width = ribCanvas.parentElement.clientWidth || 900;
+        ribCanvas.height = ribCanvas.parentElement.clientHeight || 192;
+      }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let phase = 0;
+    function animate(now) {
+      const dt = now - lastTime;
+      lastTime = now;
+      phase += dt * 0.0028;
+
+      if (autoPlay) {
+        elapsed += dt;
+        document.getElementById('auto-progress').style.width = `${Math.min(100, (elapsed / SLIDE_MS) * 100)}%`;
+        if (elapsed >= SLIDE_MS) nextSlide();
+      }
+
+      // Slide 01: Animate MiniMax Soundwave Bars
+      if (currentSlide === 0) {
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const amp = 6 + Math.sin(i * 0.32 - phase * 2.2) * 14 + Math.cos(i * 0.15 + phase) * 8;
+          const h = Math.max(4, Math.abs(amp));
+          waveBars[i].setAttribute('y1', (32 - h).toFixed(1));
+          waveBars[i].setAttribute('y2', (32 + h).toFixed(1));
+        }
+      }
+
+      // Subtle Warm Ambient Gradient Drift on Background
+      const w = ambCanvas.width;
+      const h = ambCanvas.height;
+      ambCtx.clearRect(0, 0, w, h);
+      const gx = w * (0.72 + Math.sin(phase * 0.3 + currentSlide) * 0.12);
+      const gy = h * (0.28 + Math.cos(phase * 0.25 + currentSlide) * 0.1);
+      const grad = ambCtx.createRadialGradient(gx, gy, 10, gx, gy, w * 0.48);
+      grad.addColorStop(0, 'rgba(255, 91, 46, 0.06)');
+      grad.addColorStop(0.5, 'rgba(255, 36, 66, 0.025)');
+      grad.addColorStop(1, 'rgba(246, 245, 240, 0)');
+      ambCtx.fillStyle = grad;
+      ambCtx.fillRect(0, 0, w, h);
+
+      // Slide 05: Clean Editorial Coral-Orange Ribbon Waveform
+      if (currentSlide === 4 && ribCanvas.width > 0) {
+        const rw = ribCanvas.width;
+        const rh = ribCanvas.height;
+        ribCtx.clearRect(0, 0, rw, rh);
+
+        const strands = waveDepth === 1 ? 2 : (waveDepth === 2 ? 4 : 8);
+        for (let s = 0; s < strands; s++) {
+          ribCtx.beginPath();
+          const amp = (12 + waveDepth * 16) * (1 - s * 0.09);
+          const freq = 0.005 + s * 0.002 + waveDepth * 0.0025;
+          for (let x = 0; x <= rw; x += 4) {
+            const envelope = Math.sin((x / rw) * Math.PI); // Smooth tapered ends
+            const y = rh / 2
+              + (Math.sin(x * freq - phase * (1.8 + s * 0.35)) * amp
+              + (waveDepth === 3 ? Math.cos(x * 0.018 + phase * 2.4) * 12 : 0)) * envelope;
+            if (x === 0) ribCtx.moveTo(x, y);
+            else ribCtx.lineTo(x, y);
+          }
+          ribCtx.strokeStyle = s === 0
+            ? '#FF3B2F'
+            : `rgba(255, 91, 46, ${0.55 - s * 0.06})`;
+          ribCtx.lineWidth = s === 0 ? 3 : 1.4;
+          ribCtx.lineCap = 'round';
+          ribCtx.stroke();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    updateUI();
+    runSlideTriggers(0);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
